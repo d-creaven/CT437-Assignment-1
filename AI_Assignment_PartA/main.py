@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # Parameters
 solution_size = 30
-population_size = 100
+population_size = 1000
 generations = 100
 mutation_rate = 0.01
 elite_size = 2
