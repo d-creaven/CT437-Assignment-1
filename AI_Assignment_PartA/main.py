@@ -1,23 +1,31 @@
 import random
+import matplotlib.pyplot as plt
 
 # Parameters
 solution_size = 30
 population_size = 100
-generations = 10
+generations = 100
 mutation_rate = 0.01
 elite_size = 2
 
-
-def generate_solution():
+# Common Genetic Algorithm Functions
+def generate_solution(solution_size):
     return ''.join(random.choice('01') for _ in range(solution_size))
 
 
-def generate_initial_population():
-    return [generate_solution() for _ in range(population_size)]
+def generate_population(population_size, solution_size):
+    return [generate_solution(solution_size) for _ in range(population_size)]
 
 
-def fitness(solution):
-    return sum(bit == '1' for bit in solution)
+def mutate(solution):
+    return ''.join('1' if bit == '0' and random.random() < mutation_rate else
+                   '0' if bit == '1' and random.random() < mutation_rate else
+                   bit for bit in solution)
+
+
+def one_point_crossover(parent1, parent2):
+    crossover_point = random.randint(1, len(parent1) - 1)
+    return parent1[:crossover_point] + parent2[crossover_point:], parent2[:crossover_point] + parent1[crossover_point:]
 
 
 def roulette_wheel_selection(population, fitness_scores):
@@ -32,22 +40,63 @@ def elitism(population, fitness_scores):
     return elite
 
 
-def evolutionary_algorithm():
-    population = generate_initial_population()
+# Problem-Specific Fitness Functions
+def fitness_one_max(solution):
+    return sum(bit == '1' for bit in solution)
+
+
+def fitness_target_string(solution, target):
+    return sum(s == t for s, t in zip(solution, target))
+
+
+def fitness_deceptive(solution):
+    count_ones = sum(bit == '1' for bit in solution)
+    return 2 * len(solution) if count_ones == 0 else count_ones
+
+
+# Main Genetic Algorithm Execution
+def run_genetic_algorithm(fitness_func, additional_args=None):
+    population = generate_population(population_size, solution_size)
+    average_fitness_history = []
 
     for _ in range(generations):
-        # calculate fitness for generation
-        # select new population sample
-        # elitism & roulette
+        fitness_scores = [fitness_func(individual, *additional_args) if additional_args else fitness_func(individual) for individual in population]
+        elite = elitism(population, fitness_scores)
+        selected_population = roulette_wheel_selection(population, fitness_scores)
+        selected_population = selected_population[:-elite_size]
 
-        # create new population with crossover and mutation
-        for solution in population:
-            # mutation & crossover
-            # reevaluate population fitness
-            # average fitness of the population
-            print(solution)
-            print(fitness(solution))
+        new_population = elite
+        while len(new_population) < population_size:
+            parent1, parent2 = random.sample(selected_population, 2)
+            child1, child2 = one_point_crossover(parent1, parent2)
+            new_population.extend([mutate(child1), mutate(child2)])
+
+        population = new_population[:population_size]
+        average_fitness = sum(fitness_scores) / len(fitness_scores)
+        average_fitness_history.append(average_fitness)
+
+    return average_fitness_history
 
 
-if __name__ == '__main__':
-    evolutionary_algorithm()
+# Running for each problem
+# 1.1 One-max Problem
+one_max_history = run_genetic_algorithm(fitness_one_max)
+
+# 1.2 Target String Problem
+target_string = "11001010101100101010"
+target_string_history = run_genetic_algorithm(fitness_target_string, [target_string])
+
+# 1.3 Deceptive Landscape
+deceptive_history = run_genetic_algorithm(fitness_deceptive)
+
+# Plotting the results for each problem
+plt.figure(figsize=(12, 8))
+plt.plot(one_max_history, label='One-max Problem')
+plt.plot(target_string_history, label='Target String Problem')
+plt.plot(deceptive_history, label='Deceptive Landscape')
+plt.title('Average Fitness Over Generations')
+plt.xlabel('Generation')
+plt.ylabel('Average Fitness')
+plt.legend()
+plt.grid(True)
+plt.show()
