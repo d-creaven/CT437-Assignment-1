@@ -8,7 +8,7 @@ generations = 100
 mutation_rate = 0.01
 elite_size = 2
 
-# Common Genetic Algorithm Functions
+
 def generate_solution(solution_size):
     return ''.join(random.choice('01') for _ in range(solution_size))
 
@@ -40,7 +40,6 @@ def elitism(population, fitness_scores):
     return elite
 
 
-# Problem-Specific Fitness Functions
 def fitness_one_max(solution):
     return sum(bit == '1' for bit in solution)
 
@@ -54,7 +53,6 @@ def fitness_deceptive(solution):
     return 2 * len(solution) if count_ones == 0 else count_ones
 
 
-# Main Genetic Algorithm Execution
 def run_genetic_algorithm(fitness_func, additional_args=None):
     population = generate_population(population_size, solution_size)
     average_fitness_history = []
