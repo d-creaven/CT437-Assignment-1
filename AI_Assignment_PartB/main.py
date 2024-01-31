@@ -1,143 +1,366 @@
 import random
 import matplotlib.pyplot as plt
 
-population_size = 50
-generations = 100
-mutation_rate = 0.1
+# GA Parameters
+POP_SIZE = 50
+CROSSOVER_RATE = 0.8
+MUTATION_RATE = 0.02
+GENERATIONS = 200
 
-class Bin:
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.items = []
-
-    def add_item(self, item):
-        if self.can_add(item):
-            self.items.append(item)
-            return True
-        return False
-
-    def can_add(self, item):
-        return sum(self.items) + item <= self.capacity
-
-    def remaining_capacity(self):
-        return self.capacity - sum(self.items)
-
-    def __str__(self):
-        return f"Bin(capacity={self.capacity}, items={self.items})"
-
-
-def initialize_population(population_size, items, bin_capacity):
-    population = []
-    for _ in range(population_size):
-        bins = []
-        for item in items:
-            placed = False
-            for bin in bins:
-                if bin.add_item(item):
-                    placed = True
-                    break
-            if not placed:
-                new_bin = Bin(bin_capacity)
-                new_bin.add_item(item)
-                bins.append(new_bin)
-        population.append(bins)
-    return population
-
-def read_binpacking_problems(file_path):
-    problems = []
-    with open(file_path, 'r') as file:
-        lines = file.read().splitlines()
-
+def parse_problem_instances(text):
+    instances = []
+    lines = text.strip().split('\n')
     i = 0
     while i < len(lines):
-        if lines[i].startswith("'BPP"):  # check for problem name
-            name = lines[i]
-            m = int(lines[i + 1])
-            capacity = int(lines[i + 2])
-            items = []
-            for j in range(m):
-                line = i + 3 + j
-                weight, count = map(int, lines[line].split())
-                for _ in range(count):
-                    items.append(weight)
-            problems.append((name, capacity, items))
-            i += 3 + m  # move to the next problem
+        name = lines[i].strip().strip("'")
+        i += 1
+        m = int(lines[i].strip())
+        i += 1
+        capacity = int(lines[i].strip())
+        i += 1
+        items = []
+        for _ in range(m):
+            weight, count = map(int, lines[i].strip().split())
+            items.append((weight, count))
+            i += 1
+        instances.append({'name': name, 'capacity': capacity, 'items': items})
+    return instances
+
+def initialize_population(problem_instance):
+    population = []
+    for _ in range(POP_SIZE):
+        individual = []
+        for weight, count in problem_instance['items']:
+            for _ in range(count):
+                individual.append(random.randint(1, POP_SIZE))  # Assign to a random bin
+        random.shuffle(individual)  # Shuffle to ensure randomness
+        population.append(individual)
+    return population
+
+def calculate_fitness(solution, items, capacity):
+    bins = {}
+    for idx, bin_num in enumerate(solution):
+        item_weight = items[idx]  # Directly use the item weight
+        bins.setdefault(bin_num, 0)
+        bins[bin_num] += item_weight
+    penalty = sum(1 for total_weight in bins.values() if total_weight > capacity)
+    fitness = len(bins) + penalty
+    return fitness
+
+
+def select_parents(population, capacity, items):
+    parents = []
+    for _ in range(2):
+        contenders = random.sample(population, 3)
+        contenders.sort(key=lambda ind: calculate_fitness(ind, items, capacity))
+        parents.append(contenders[0])
+    return parents
+
+def crossover(parent1, parent2):
+    if random.random() < CROSSOVER_RATE:
+        point = random.randint(1, len(parent1) - 2)
+        return parent1[:point] + parent2[point:], parent2[:point] + parent1[point:]
+    return parent1[:], parent2[:]
+
+def mutate(individual):
+    for i in range(len(individual)):
+        if random.random() < MUTATION_RATE:
+            individual[i] = random.randint(1, POP_SIZE)
+
+def run_ga(problem_instance):
+    capacity = problem_instance['capacity']
+    items = sum(([weight] * count for weight, count in problem_instance['items']), [])
+    population = initialize_population(problem_instance)
+    best_fitness = float('inf')
+    avg_fitness_over_generations = []
+
+    for generation in range(GENERATIONS):
+        new_population = []
+        for _ in range(POP_SIZE // 2):
+            parent1, parent2 = select_parents(population, capacity, items)
+            offspring1, offspring2 = crossover(parent1, parent2)
+            mutate(offspring1)
+            mutate(offspring2)
+            new_population.extend([offspring1, offspring2])
+
+        population = sorted(new_population, key=lambda ind: calculate_fitness(ind, items, capacity))[:POP_SIZE]
+        current_best_fitness = calculate_fitness(population[0], items, capacity)
+        best_fitness = min(best_fitness, current_best_fitness)
+        avg_fitness = sum(calculate_fitness(ind, items, capacity) for ind in population) / POP_SIZE
+        avg_fitness_over_generations.append(avg_fitness)
+
+    return population[0], avg_fitness_over_generations
+
+def post_process_solution(solution, items, capacity):
+    bins = {}
+    for idx, bin_num in enumerate(solution):
+        item_weight = items[idx % len(items)]
+        if bin_num in bins:
+            bins[bin_num].append(item_weight)
         else:
-            i += 1  # increment if line is not new problem
+            bins[bin_num] = [item_weight]
+    fitness = calculate_fitness(solution, items, capacity)
+    print(f"Solution Fitness: {fitness}")
+    for bin_num, contents in sorted(bins.items()):
+        print(f"Bin {bin_num}: Items {contents}, Total Weight: {sum(contents)}")
 
-    return problems
+# Replace this string with your actual problem instances
+problem_text = """
+'BPP      1'
+      46
+    1000
+     200         3
+     199         1
+     198         2
+     197         2
+     194         2
+     193         1
+     192         1
+     191         3
+     190         2
+     189         1
+     188         2
+     187         2
+     186         1
+     185         4
+     184         3
+     183         3
+     182         3
+     181         2
+     180         1
+     179         4
+     178         1
+     177         4
+     175         1
+     174         1
+     173         2
+     172         1
+     171         3
+     170         2
+     169         3
+     167         2
+     165         2
+     164         1
+     163         4
+     162         1
+     161         1
+     160         2
+     159         1
+     158         3
+     157         1
+     156         6
+     155         3
+     154         2
+     153         1
+     152         3
+     151         2
+     150         4
+'BPP      2'
+      47
+    1000
+     200         2
+     199         4
+     198         1
+     197         1
+     196         2
+     195         2
+     194         2
+     193         1
+     191         2
+     190         1
+     189         2
+     188         1
+     187         2
+     186         1
+     185         2
+     184         5
+     183         1
+     182         1
+     181         3
+     180         2
+     179         2
+     178         1
+     176         1
+     175         2
+     174         5
+     173         1
+     172         3
+     171         1
+     170         4
+     169         2
+     168         1
+     167         5
+     165         2
+     164         2
+     163         3
+     162         2
+     160         2
+     159         2
+     158         2
+     157         4
+     156         3
+     155         2
+     154         1
+     153         3
+     152         2
+     151         2
+     150         2
+'BPP      3'
+      44
+    1000
+     200         1
+     199         2
+     197         2
+     196         2
+     193         3
+     192         2
+     191         2
+     190         2
+     189         3
+     188         1
+     187         1
+     185         3
+     183         2
+     182         1
+     181         3
+     180         3
+     179         3
+     178         1
+     177         5
+     176         2
+     175         5
+     174         4
+     173         1
+     171         3
+     170         1
+     169         2
+     168         5
+     167         1
+     166         4
+     165         2
+     163         1
+     162         2
+     161         2
+     160         3
+     159         2
+     158         2
+     157         1
+     156         3
+     155         3
+     154         1
+     153         2
+     152         3
+     151         2
+     150         1
+'BPP      4'
+      42
+    1000
+     200         3
+     199         5
+     198         4
+     197         1
+     195         1
+     193         4
+     192         1
+     188         1
+     187         1
+     186         3
+     185         3
+     184         2
+     183         2
+     182         1
+     181         1
+     180         3
+     179         2
+     178         6
+     177         2
+     176         4
+     175         1
+     173         4
+     172         4
+     170         1
+     169         3
+     168         4
+     167         1
+     165         3
+     164         1
+     163         2
+     162         4
+     161         1
+     160         3
+     159         3
+     158         1
+     157         3
+     155         2
+     154         3
+     153         1
+     152         3
+     151         1
+     150         1
+'BPP      5'
+      44
+    1000
+     200         5
+     199         2
+     198         2
+     197         2
+     196         1
+     195         3
+     194         2
+     193         2
+     192         4
+     191         2
+     190         4
+     188         3
+     187         2
+     186         2
+     185         1
+     184         1
+     183         1
+     182         1
+     181         3
+     180         1
+     178         3
+     177         2
+     176         2
+     174         1
+     173         1
+     172         1
+     171         3
+     168         2
+     167         1
+     165         1
+     164         1
+     163         1
+     162         3
+     161         3
+     160         3
+     159         2
+     158         3
+     157         3
+     156         2
+     155         5
+     154         3
+     153         3
+     151         5
+     150         2
+"""
 
+if __name__ == "__main__":
+    problem_instances = parse_problem_instances(problem_text)
+    plt.figure(figsize=(10, 6))
 
-def calculate_fitness(bins):
-    return len(bins)
+    for problem_instance in problem_instances:
+        best_solution, avg_fitness_over_generations = run_ga(problem_instance)
+        plt.plot(avg_fitness_over_generations, label=f"{problem_instance['name']}")
 
-def tournament_selection(population, k=3):
-    selected = []
-    for _ in range(len(population)):
-        aspirants = random.sample(population, k)
-        winner = min(aspirants, key=calculate_fitness)
-        selected.append(winner)
-    return selected
+        # Post-process and print the best solution details
+        print(f"\nBest Solution for {problem_instance['name']}:")
+        items = sum(([weight] * count for weight, count in problem_instance['items']), [])
+        post_process_solution(best_solution, items, problem_instance['capacity'])
 
-def mutate(bins):
-    if len(bins) > 1:
-        bin1, bin2 = random.sample(bins, 2)
-        if bin1.items and bin2.items:
-            item1, item2 = random.choice(bin1.items), random.choice(bin2.items)
-            if bin1.can_add(item2) and bin2.can_add(item1):
-                bin1.items.remove(item1)
-                bin2.items.remove(item2)
-                bin1.add_item(item2)
-                bin2.add_item(item1)
-    return bins
-
-def one_point_crossover(parent1, parent2):
-    crossover_point = random.randint(1, min(len(parent1), len(parent2)) - 1)
-    child1 = parent1[:crossover_point] + parent2[crossover_point:]
-    child2 = parent2[:crossover_point] + parent1[crossover_point:]
-    return child1, child2
-
-def genetic_algorithm(items, bin_capacity, population_size, generations):
-    population = initialize_population(population_size, items, bin_capacity)
-    avg_fitness_evolution = []  # List to store average fitness per generation
-
-    for generation in range(generations):
-        fitness_scores = [calculate_fitness(solution) for solution in population]
-        parents = tournament_selection(population)
-
-        offspring = []
-        for i in range(0, len(parents), 2):
-            for child in one_point_crossover(parents[i], parents[(i + 1) % len(parents)]):
-                offspring.append(mutate(child))
-
-        population = offspring[:population_size]
-
-        # Calculate and append average fitness for this generation
-        avg_fitness = sum(fitness_scores) / len(fitness_scores)
-        avg_fitness_evolution.append(avg_fitness)
-
-    best_solution = min(population, key=calculate_fitness)
-    return best_solution, calculate_fitness(best_solution), avg_fitness_evolution
-
-avg_fitness_per_problem = []  # List to store average fitness per problem
-
-bins_used = []
-
-problems = read_binpacking_problems('Binpacking.txt')
-for name, capacity, items in problems:
-    best_solution, best_fitness, avg_fitness_evolution = genetic_algorithm(items, capacity, population_size, generations)
-    print(f"Best solution for {name}: {best_fitness} bins used")
-    bins_used.append(best_fitness)
-    avg_fitness_per_problem.append(avg_fitness_evolution)
-
-# Plotting average fitness evolution per problem
-plt.figure(figsize=(12, 6))
-for i, avg_fitness_evolution in enumerate(avg_fitness_per_problem):
-    plt.plot(range(generations), avg_fitness_evolution, label=f'Problem {i+1}')
-plt.xlabel('Generation')
-plt.ylabel('Average Fitness')
-plt.title('Average Fitness Evolution per Problem')
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.show()
+    plt.title("Average Best Fitness over Generations for All Problem Instances")
+    plt.xlabel("Generation")
+    plt.ylabel("Average Best Fitness")
+    plt.legend()
+    plt.show()
