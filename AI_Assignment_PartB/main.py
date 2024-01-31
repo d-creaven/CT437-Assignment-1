@@ -1,4 +1,5 @@
 import random
+import matplotlib.pyplot as plt
 
 population_size = 50
 generations = 100
@@ -98,6 +99,7 @@ def one_point_crossover(parent1, parent2):
 
 def genetic_algorithm(items, bin_capacity, population_size, generations):
     population = initialize_population(population_size, items, bin_capacity)
+    avg_fitness_evolution = []  # List to store average fitness per generation
 
     for generation in range(generations):
         fitness_scores = [calculate_fitness(solution) for solution in population]
@@ -110,11 +112,32 @@ def genetic_algorithm(items, bin_capacity, population_size, generations):
 
         population = offspring[:population_size]
 
+        # Calculate and append average fitness for this generation
+        avg_fitness = sum(fitness_scores) / len(fitness_scores)
+        avg_fitness_evolution.append(avg_fitness)
+
     best_solution = min(population, key=calculate_fitness)
-    return best_solution, calculate_fitness(best_solution)
+    return best_solution, calculate_fitness(best_solution), avg_fitness_evolution
+
+avg_fitness_per_problem = []  # List to store average fitness per problem
+
+bins_used = []
 
 problems = read_binpacking_problems('Binpacking.txt')
 for name, capacity, items in problems:
-    best_solution, best_fitness = genetic_algorithm(items, capacity, population_size, generations)
+    best_solution, best_fitness, avg_fitness_evolution = genetic_algorithm(items, capacity, population_size, generations)
     print(f"Best solution for {name}: {best_fitness} bins used")
+    bins_used.append(best_fitness)
+    avg_fitness_per_problem.append(avg_fitness_evolution)
 
+# Plotting average fitness evolution per problem
+plt.figure(figsize=(12, 6))
+for i, avg_fitness_evolution in enumerate(avg_fitness_per_problem):
+    plt.plot(range(generations), avg_fitness_evolution, label=f'Problem {i+1}')
+plt.xlabel('Generation')
+plt.ylabel('Average Fitness')
+plt.title('Average Fitness Evolution per Problem')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
