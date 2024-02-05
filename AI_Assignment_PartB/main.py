@@ -113,6 +113,21 @@ if __name__ == "__main__":
         best_solution, avg_fitness_over_generations = run_ga(problem_instance)
         plt.plot(avg_fitness_over_generations, label=f"{problem_instance['name']}")
 
+        print(f"\nBest Solution for {problem_instance['name']}:")
+        bins = {}
+        for item_idx, bin_num in enumerate(best_solution):
+            if bin_num not in bins:
+                bins[bin_num] = []
+            # Assuming each item's weight is repeated according to its count in the problem instance
+            item_weight = problem_instance['items'][item_idx % len(problem_instance['items'])][0]
+            bins[bin_num].append(item_weight)
+
+        # Print the total number of bins used
+        print(f"Total number of bins used: {len(bins)}")
+
+        for bin_num, items in bins.items():
+            print(f"  Bin {bin_num}: Items {items}, Total Weight: {sum(items)}")
+
     plt.title("Average Best Fitness over Generations for All Problem Instances")
     plt.xlabel("Generation")
     plt.ylabel("Average Best Fitness")
